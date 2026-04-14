@@ -1,0 +1,404 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -816,
+        -288
+      ],
+      "id": "47400b64-9822-4f39-a997-e3fb3648a564",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "1uAJU0iikK948bfZVxOvhGZ38VgqZwR-n",
+          "mode": "list",
+          "cachedResultName": "2_orga.pdf",
+          "cachedResultUrl": "https://drive.google.com/file/d/1uAJU0iikK948bfZVxOvhGZ38VgqZwR-n/view?usp=drivesdk"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -576,
+        -272
+      ],
+      "id": "23416290-281e-4cb2-90ed-a802f6e051e4",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "ZLLKQux8ff7UJu4e",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -368,
+        -256
+      ],
+      "id": "3491561d-bef8-4106-b5bd-fca660546c6e",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "jsCode": "// récupation de texte extrait du nœud précédent\nconst fullText = $input.first().json.text || $input.first().json.data || \"\";\n\n//  découpage de texte en morceaux de 1000 caractères\nconst chunks = fullText.match(/[\\s\\S]{1,1000}/g) || [];\n\n// transformation de  chaque morceau en un \"item\" n8n individuel\nreturn chunks.map(chunk => {\n  return {\n    json: {\n      content: chunk,\n      metadata: { source: \"google_drive_pdf\" }\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        -256
+      ],
+      "id": "3a623245-e19a-4c4f-b188-3d076cb340e8",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2-preview:embedContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "AIzaSyCGlc3QLU6saZoEpK6sTOIhO6orsP0BmCs"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": {\n    \"parts\": [\n      {\n        \"text\": {{ JSON.stringify($json.content) }}\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        64,
+        -256
+      ],
+      "id": "e3f69486-a62f-4293-9255-56cde9a6e190",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "df268aee-856d-4182-886e-01d81693a95b",
+              "name": "content",
+              "value": "={{ $('Code in JavaScript').item.json.content }}",
+              "type": "string"
+            },
+            {
+              "id": "f245e17a-99f9-4cc7-bb80-131c3357fbf6",
+              "name": "embedding",
+              "value": "={{ $json.embedding.values }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        272,
+        -256
+      ],
+      "id": "43dc8aa7-26f7-4a97-986b-716d2967125e",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "tableId": "documents",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "content",
+              "fieldValue": "={{$json.content}}"
+            },
+            {
+              "fieldId": "embedding",
+              "fieldValue": "={{$json.embedding}}"
+            },
+            {
+              "fieldId": "metadata",
+              "fieldValue": "={\n  \"source\": \"pdf\"\n}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        464,
+        -224
+      ],
+      "id": "0e328524-67cd-4c5c-ab73-6de3be362c5d",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZmS6Me7fhy1ADGSs",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "chat",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -896,
+        48
+      ],
+      "id": "c2cd3909-5857-40d6-a252-16edaa1ce3bf",
+      "name": "Webhook",
+      "webhookId": "42e97b2e-4f51-404b-8fd4-fabddf3b94a0"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=AIzaSyCGlc3QLU6saZoEpK6sTOIhO6orsP0BmCs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": {\n    \"parts\": [\n      {\n        \"text\": \"{{ $json.body.question }}\"\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -688,
+        48
+      ],
+      "id": "89a24e7a-1005-490e-8aff-39fa9e5e21c7",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://iqzxphyziwbeycxvkeqs.supabase.co/rest/v1/rpc/match_documents",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "sb_publishable_ScS1GrZH4a_UsB47pKaaPA_muv1NcsH"
+            },
+            {
+              "name": "Authorization",
+              "value": "sb_publishable_ScS1GrZH4a_UsB47pKaaPA_muv1NcsH"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"query_embedding\": {{ JSON.stringify($json.embedding.values) }},\n  \"match_count\": 5\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -480,
+        48
+      ],
+      "id": "4579a492-8400-4c60-8759-6e6be0459565",
+      "name": "HTTP Request2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = items.map(item => item.json.content);\n\nreturn [\n  {\n    json: {\n      context: results.join(\"\\n\\n\")\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -272,
+        48
+      ],
+      "id": "0da09d37-f495-4d3d-93bd-4146bc524fd0",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "AIzaSyCGlc3QLU6saZoEpK6sTOIhO6orsP0BmCs"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"parts\": [\n        {\n          \"text\": \"Tu es un assistant.\\n\\nContexte:\\n{{$json.context}}\\n\\nQuestion:\\n{{$node['Webhook'].json['question']}}\\n\\nRéponds clairement.\"\n        }\n      ]\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -64,
+        48
+      ],
+      "id": "59df07b0-0803-4aa9-9e08-7de070bb6870",
+      "name": "HTTP Request3"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "704e4fa9-bac8-4b7e-948a-5d414d7cdc12",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "32ce63c4f507d0cb80ce5a82cb373f3f33dc0c121f5d37cc327c621e33548a77"
+  },
+  "id": "3Z6oVIvMTuwEvMqX",
+  "tags": []
+}
